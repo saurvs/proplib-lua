@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #define PROP_ARRAY_MT "prop.array"
+#define PROP_DICT_MT "prop.dict"
 #define IDX_RANGE_ERR "index out of range"
 
 static int array_new(lua_State *L) {
@@ -114,13 +115,6 @@ static int array_to_xml(lua_State *L) {
     return 1;
 }
 
-static const struct luaL_Reg proplib[] = {
-    {"new_array", array_new},
-    {"array_from_file", array_from_file},
-    {"array_from_xml", array_from_xml},
-    {NULL, NULL}
-};
-
 static const struct luaL_Reg array_methods[] = {
     {"set", array_set},
     {"get", array_get},
@@ -132,11 +126,142 @@ static const struct luaL_Reg array_methods[] = {
     {NULL, NULL}
 };
 
+static int dict_new(lua_State *L) {
+    prop_dictionary_t *dict;
+    
+    dict = lua_newuserdata(L, sizeof(prop_dictionary_t));
+    *dict = prop_dictionary_create();
+    luaL_getmetatable(L, PROP_DICT_MT);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static int dict_from_file(lua_State *L) {
+    prop_dictionary_t *dict;
+    
+    dict = lua_newuserdata(L, sizeof(prop_dictionary_t));
+    *dict = prop_dictionary_internalize_from_file(luaL_checkstring(L, 1));
+    luaL_getmetatable(L, PROP_DICT_MT);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static int dict_from_xml(lua_State *L) {
+    prop_dictionary_t *dict;
+    
+    dict = lua_newuserdata(L, sizeof(prop_dictionary_t));
+    *dict = prop_dictionary_internalize(luaL_checkstring(L, 1));
+    luaL_getmetatable(L, PROP_DICT_MT);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static int dict_set(lua_State *L) {
+    prop_dictionary_t *dict;
+    const char *key;
+    int n;
+    
+    dict = luaL_checkudata(L, 1, PROP_DICT_MT);
+    key = luaL_checkstring(L, 2);
+    n = lua_tonumber(L, 3);
+    prop_dictionary_set(*dict, key, prop_number_create_integer(n));
+    return 0;
+}
+
+static int dict_get(lua_State *L) {
+    prop_dictionary_t *dict;
+    const char *key;
+    int n;
+    
+    dict = luaL_checkudata(L, 1, PROP_DICT_MT);
+    key = luaL_checkstring(L, 2);
+    n = prop_number_integer_value(prop_dictionary_get(*dict, key));
+    lua_pushinteger(L, n);
+    return 1;
+}
+
+static int dict_remove(lua_State *L) {
+    prop_dictionary_t *dict;
+    const char *key;
+    
+    dict = luaL_checkudata(L, 1, PROP_DICT_MT);
+    key = luaL_checkstring(L, 2);
+    prop_dictionary_remove(*dict, key);
+    return 0;
+}
+
+static int dict_count(lua_State *L) {
+    prop_dictionary_t *dict;
+    
+    dict = luaL_checkudata(L, 1, PROP_DICT_MT);
+    lua_pushinteger(L, prop_dictionary_count(*dict));
+    return 1;
+}
+
+static int dict_keys(lua_State *L) {
+    prop_array_t *array;
+    prop_dictionary_t *dict;
+    
+    dict = luaL_checkudata(L, 1, PROP_DICT_MT);
+    array = lua_newuserdata(L, sizeof(prop_array_t));
+    *array = prop_dictionary_all_keys(*dict);
+    luaL_getmetatable(L, PROP_ARRAY_MT);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static int dict_to_file(lua_State *L) {
+    prop_dictionary_t *dict;
+    
+    dict = lua_touserdata(L, 1);
+    prop_dictionary_externalize_to_file(*dict, luaL_checkstring(L, 2));
+    return 0;
+}
+
+static int dict_to_xml(lua_State *L) {
+    prop_dictionary_t *dict;
+    char *xml;
+    
+    dict = lua_touserdata(L, 1);
+    xml = prop_dictionary_externalize(*dict);
+    lua_pushstring(L, xml);
+    free(xml);
+    return 1;
+}
+
+static const struct luaL_Reg dict_methods[] = {
+    {"set", dict_set},
+    {"get", dict_get},
+    {"remove", dict_remove},
+    {"count", dict_count},
+    {"keys", dict_keys},
+    {"to_file", dict_to_file},
+    {"to_xml", dict_to_xml},
+    {NULL, NULL}
+};
+
+static const struct luaL_Reg proplib[] = {
+    {"new_array", array_new},
+    {"array_from_file", array_from_file},
+    {"array_from_xml", array_from_xml},
+    
+    {"new_dict", dict_new},
+    {"dict_from_file", dict_from_file},
+    {"dict_from_xml", dict_from_xml},
+    {NULL, NULL}
+};
+
 int luaopen_proplib(lua_State *L) {
     luaL_newmetatable(L, PROP_ARRAY_MT);
     lua_pushvalue(L, -1);
     lua_setfield(L, -2, "__index");
     luaL_setfuncs(L, array_methods, 0);
+    
+    luaL_newmetatable(L, PROP_DICT_MT);
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -2, "__index");
+    luaL_setfuncs(L, dict_methods, 0);
+    
     luaL_newlib(L, proplib);
     return 1;
 }
