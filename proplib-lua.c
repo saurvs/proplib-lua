@@ -7,6 +7,47 @@
 #define PROP_DICT_MT "prop.dict"
 #define IDX_RANGE_ERR "index out of range"
 
+static prop_object_t arg_to_prop_object(lua_State *L, int arg) {
+    prop_object_t obj;
+    
+    switch (lua_type(L, arg)) {
+	case LUA_TNUMBER:
+	    obj = prop_number_create_integer(lua_tonumber(L, arg));
+	    break;
+	case LUA_TSTRING:
+	    obj = prop_string_create_cstring(lua_tostring(L, arg));
+	    break;
+	case LUA_TBOOLEAN:
+	    obj = prop_bool_create(lua_toboolean(L, arg));
+	    break;
+	default:
+	    luaL_argerror(L, arg, "type not supported");
+	    break;
+    }
+    
+    return obj;
+}
+
+static void push_arg_using_prop_object(lua_State *L, prop_object_t obj) {
+    char *str;
+    
+    switch (prop_object_type(obj)) {
+	case PROP_TYPE_NUMBER:
+	    lua_pushinteger(L, prop_number_integer_value(obj));
+	    break;
+	case PROP_TYPE_STRING:
+	    str = prop_string_cstring(obj);
+	    lua_pushstring(L, str);
+	    free(str);
+	    break;
+	case PROP_TYPE_BOOL:
+	    lua_pushboolean(L, prop_bool_true(obj));
+	    break;
+	default:
+	    break;
+    }
+}
+
 static int array_new(lua_State *L) {
     prop_array_t *array;
     
@@ -39,15 +80,16 @@ static int array_from_xml(lua_State *L) {
 
 static int array_set(lua_State *L) {
     prop_array_t *array;
-    int i, n;
+    prop_object_t obj;
+    int i;
     
     array = luaL_checkudata(L, 1, PROP_ARRAY_MT);
     i = lua_tonumber(L, 2);
     luaL_argcheck(L,
 	i >= 0 && i <= prop_array_count(*array),
 	2, IDX_RANGE_ERR);
-    n = lua_tonumber(L, 3);
-    prop_array_set(*array, i, prop_number_create_integer(n));
+    obj = arg_to_prop_object(L, 3);
+    prop_array_set(*array, i, obj);
     return 0;
 }
 
@@ -60,18 +102,17 @@ static int array_get(lua_State *L) {
     luaL_argcheck(L,
 	i >= 0 && i < prop_array_count(*array),
 	2, IDX_RANGE_ERR);
-    n = prop_number_integer_value(prop_array_get(*array, i));
-    lua_pushinteger(L, n);
+    push_arg_using_prop_object(L, prop_array_get(*array, i));
     return 1;
 }
 
 static int array_append(lua_State *L) {
     prop_array_t *array;
-    int n;
+    prop_object_t obj;
     
     array = luaL_checkudata(L, 1, PROP_ARRAY_MT);
-    n = lua_tonumber(L, 2);
-    prop_array_add(*array, prop_number_create_integer(n));
+    obj = arg_to_prop_object(L, 2);
+    prop_array_add(*array, obj);
     return 0;
 }
 
@@ -157,14 +198,14 @@ static int dict_from_xml(lua_State *L) {
 }
 
 static int dict_set(lua_State *L) {
-    prop_dictionary_t *dict;
     const char *key;
-    int n;
+    prop_dictionary_t *dict;
+    prop_object_t obj;
     
     dict = luaL_checkudata(L, 1, PROP_DICT_MT);
     key = luaL_checkstring(L, 2);
-    n = lua_tonumber(L, 3);
-    prop_dictionary_set(*dict, key, prop_number_create_integer(n));
+    obj = arg_to_prop_object(L, 3);
+    prop_dictionary_set(*dict, key, obj);
     return 0;
 }
 
@@ -175,8 +216,7 @@ static int dict_get(lua_State *L) {
     
     dict = luaL_checkudata(L, 1, PROP_DICT_MT);
     key = luaL_checkstring(L, 2);
-    n = prop_number_integer_value(prop_dictionary_get(*dict, key));
-    lua_pushinteger(L, n);
+    push_arg_using_prop_object(L, prop_dictionary_get(*dict, key));
     return 1;
 }
 
