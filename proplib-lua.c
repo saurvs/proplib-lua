@@ -7,16 +7,19 @@
  * MT stands for metatable
  */
 
-#define ARRAY_MT "prop.array"
-#define DICT_MT "prop.dict"
+#define ARRAY_MT         "prop.array"
+#define DICT_MT          "prop.dict"
 
-#define IDX_RANGE_ERR "index out of range"
+#define IDX_RANGE_ERR    "index out of range"
+#define UNSIGNED_INT_ERR "unsigned number expected"
 
 /*
  * Common code used by both array and dict functions/methods
  */
 
-static prop_object_t arg_to_prop_object(lua_State *L, int arg) {
+static prop_object_t
+arg_to_prop_object(lua_State *L, int arg)
+{
     prop_object_t obj;
     
     switch (lua_type(L, arg)) {
@@ -33,11 +36,12 @@ static prop_object_t arg_to_prop_object(lua_State *L, int arg) {
 	    luaL_argerror(L, arg, "type not supported");
 	    break;
     }
-    
     return obj;
 }
 
-static void push_arg_using_prop_object(lua_State *L, prop_object_t obj) {
+static void
+push_arg_using_prop_object(lua_State *L, prop_object_t obj)
+{
     char *str;
     
     switch (prop_object_type(obj)) {
@@ -61,18 +65,27 @@ static void push_arg_using_prop_object(lua_State *L, prop_object_t obj) {
  * array functions
  */
 
-static int new_array(lua_State *L) {
+static int
+new_array(lua_State *L)
+{
     prop_array_t *array;
     int c;
     
+    c = lua_isnumber(L, 1);
+    if (c == 1) {
+	c = luaL_checknumber(L, 1);
+	luaL_argcheck(L, c >= 0, 1, UNSIGNED_INT_ERR);
+    }
     array = lua_newuserdata(L, sizeof(prop_array_t));
-    *array = prop_array_create();
+    *array = prop_array_create_with_capacity(c);
     luaL_getmetatable(L, ARRAY_MT);
     lua_setmetatable(L, -2);
     return 1;
 }
 
-static int array_from_file(lua_State *L) {
+static int
+array_from_file(lua_State *L)
+{
     prop_array_t *array;
     
     array = lua_newuserdata(L, sizeof(prop_array_t));
@@ -82,7 +95,9 @@ static int array_from_file(lua_State *L) {
     return 1;
 }
 
-static int array_from_xml(lua_State *L) {
+static int
+array_from_xml(lua_State *L)
+{
     prop_array_t *array;
     
     array = lua_newuserdata(L, sizeof(prop_array_t));
@@ -92,7 +107,9 @@ static int array_from_xml(lua_State *L) {
     return 1;
 }
 
-static const struct luaL_Reg proplib_array[] = {
+static const struct luaL_Reg
+proplib_array[]
+= {
     {"new", new_array},
     {"from_file", array_from_file},
     {"from_xml", array_from_xml},
@@ -103,7 +120,9 @@ static const struct luaL_Reg proplib_array[] = {
  * array methods
  */
 
-static int array_set(lua_State *L) {
+static int
+array_set(lua_State *L)
+{
     prop_array_t *array;
     prop_object_t obj;
     int i;
@@ -118,7 +137,9 @@ static int array_set(lua_State *L) {
     return 0;
 }
 
-static int array_get(lua_State *L) {
+static int
+array_get(lua_State *L)
+{
     prop_array_t *array;
     int i, n;
     
@@ -131,7 +152,9 @@ static int array_get(lua_State *L) {
     return 1;
 }
 
-static int array_append(lua_State *L) {
+static int
+array_append(lua_State *L)
+{
     prop_array_t *array;
     prop_object_t obj;
     
@@ -141,7 +164,9 @@ static int array_append(lua_State *L) {
     return 0;
 }
 
-static int array_remove(lua_State *L) {
+static int
+array_remove(lua_State *L)
+{
     prop_array_t *array;
     int i;
     
@@ -154,7 +179,9 @@ static int array_remove(lua_State *L) {
     return 0;
 }
 
-static int array_count(lua_State *L) {
+static int
+array_count(lua_State *L)
+{
     prop_array_t *array;
     
     array = luaL_checkudata(L, 1, ARRAY_MT);
@@ -162,7 +189,9 @@ static int array_count(lua_State *L) {
     return 1;
 }
 
-static int array_to_file(lua_State *L) {
+static int
+array_to_file(lua_State *L)
+{
     prop_array_t *array;
     
     array = lua_touserdata(L, 1);
@@ -170,7 +199,9 @@ static int array_to_file(lua_State *L) {
     return 0;
 }
 
-static int array_to_xml(lua_State *L) {
+static int
+array_to_xml(lua_State *L)
+{
     prop_array_t *array;
     char *xml;
     
@@ -181,7 +212,9 @@ static int array_to_xml(lua_State *L) {
     return 1;
 }
 
-static const struct luaL_Reg array_methods[] = {
+static const struct luaL_Reg
+array_methods[]
+= {
     {"set", array_set},
     {"get", array_get},
     {"append", array_append},
@@ -196,17 +229,27 @@ static const struct luaL_Reg array_methods[] = {
  * dict functions
  */
 
-static int new_dict(lua_State *L) {
+static int
+new_dict(lua_State *L)
+{
     prop_dictionary_t *dict;
+    int c;
     
+    c = lua_isnumber(L, 1);
+    if (c == 1) {
+	c = luaL_checknumber(L, 1);
+	luaL_argcheck(L, c >= 0, 1, UNSIGNED_INT_ERR);
+    }
     dict = lua_newuserdata(L, sizeof(prop_dictionary_t));
-    *dict = prop_dictionary_create();
+    *dict = prop_dictionary_create_with_capacity(c);
     luaL_getmetatable(L, DICT_MT);
     lua_setmetatable(L, -2);
     return 1;
 }
 
-static int dict_from_file(lua_State *L) {
+static int
+dict_from_file(lua_State *L)
+{
     prop_dictionary_t *dict;
     
     dict = lua_newuserdata(L, sizeof(prop_dictionary_t));
@@ -216,7 +259,9 @@ static int dict_from_file(lua_State *L) {
     return 1;
 }
 
-static int dict_from_xml(lua_State *L) {
+static int
+dict_from_xml(lua_State *L)
+{
     prop_dictionary_t *dict;
     
     dict = lua_newuserdata(L, sizeof(prop_dictionary_t));
@@ -230,7 +275,9 @@ static int dict_from_xml(lua_State *L) {
  * dict methods
  */
 
-static int dict_set(lua_State *L) {
+static int
+dict_set(lua_State *L)
+{
     const char *key;
     prop_dictionary_t *dict;
     prop_object_t obj;
@@ -242,7 +289,9 @@ static int dict_set(lua_State *L) {
     return 0;
 }
 
-static int dict_get(lua_State *L) {
+static int
+dict_get(lua_State *L)
+{
     prop_dictionary_t *dict;
     const char *key;
     int n;
@@ -253,7 +302,9 @@ static int dict_get(lua_State *L) {
     return 1;
 }
 
-static int dict_remove(lua_State *L) {
+static int
+dict_remove(lua_State *L)
+{
     prop_dictionary_t *dict;
     const char *key;
     
@@ -263,7 +314,9 @@ static int dict_remove(lua_State *L) {
     return 0;
 }
 
-static int dict_count(lua_State *L) {
+static int
+dict_count(lua_State *L)
+{
     prop_dictionary_t *dict;
     
     dict = luaL_checkudata(L, 1, DICT_MT);
@@ -271,7 +324,9 @@ static int dict_count(lua_State *L) {
     return 1;
 }
 
-static int dict_keys(lua_State *L) {
+static int
+dict_keys(lua_State *L)
+{
     prop_array_t *array;
     prop_dictionary_t *dict;
     
@@ -283,7 +338,9 @@ static int dict_keys(lua_State *L) {
     return 1;
 }
 
-static int dict_to_file(lua_State *L) {
+static int
+dict_to_file(lua_State *L)
+{
     prop_dictionary_t *dict;
     
     dict = lua_touserdata(L, 1);
@@ -291,7 +348,9 @@ static int dict_to_file(lua_State *L) {
     return 0;
 }
 
-static int dict_to_xml(lua_State *L) {
+static int
+dict_to_xml(lua_State *L)
+{
     prop_dictionary_t *dict;
     char *xml;
     
@@ -302,7 +361,9 @@ static int dict_to_xml(lua_State *L) {
     return 1;
 }
 
-static const struct luaL_Reg dict_methods[] = {
+static const struct luaL_Reg
+dict_methods[]
+= {
     {"set", dict_set},
     {"get", dict_get},
     {"remove", dict_remove},
@@ -313,7 +374,9 @@ static const struct luaL_Reg dict_methods[] = {
     {NULL, NULL}
 };
 
-static const struct luaL_Reg proplib_dict[] = {
+static const struct luaL_Reg
+proplib_dict[]
+= {
     {"new", new_dict},
     {"from_file", dict_from_file},
     {"from_xml", dict_from_xml},
@@ -324,7 +387,9 @@ static const struct luaL_Reg proplib_dict[] = {
  * open proplib
  */
 
-int luaopen_proplib(lua_State *L) {
+int
+luaopen_proplib(lua_State *L)
+{
     luaL_newmetatable(L, ARRAY_MT);
     lua_pushvalue(L, -1);
     lua_setfield(L, -2, "__index");
